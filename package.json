@@ -1,0 +1,41 @@
+{
+  "name": "form-server",
+  "author": {
+    "name": "Mark Chapman",
+    "email": "support@reallycare.org"
+  },
+  "description": "A form builder for molecuel currently relying on forms-angular",
+  "homepage": "http://forms-angular.org",
+  "version": "0.0.1",
+  "engines": {
+    "node": "0.10.x",
+    "npm": "1.x"
+  },
+  "dependencies": {
+    "underscore": "~1.6",
+    "underscore.nested": ">=0.0.1",
+    "node.extend": "~1.0",
+    "async": "~0.2",
+    "body-parser": ">=0.0.1",
+    "method-override": ">=0.0.1",
+    "errorhandler": ">=0.0.1",
+    "debug": ">=0.0.1"
+  },
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/molecuel/form-server"
+  },
+  "keywords": [
+    "angular",
+    "mongoose",
+    "twitter bootstrap",
+    "express",
+    "form builder",
+    "REST API",
+    "RESTful API"
+  ],
+  "license": "MIT",
+  "readme": "Credits to http://forms-angular.org",
+  "readmeFilename": "README.md",
+}
