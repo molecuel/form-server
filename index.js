@@ -8,7 +8,7 @@ var _ = require('underscore'),
   async = require('async'),
   url = require('url'),
   debug = require('debug')('form-server'),
-  _.mixin(require('underscore.nested'));
+  underscoreNested = require('underscore.nested');
 
 
 function logTheAPICalls(req, res, next) {
@@ -26,6 +26,7 @@ function processArgs(options, array) {
 }
 
 var DataForm = function (app, elements, options) {
+  _.mixin(underscoreNested);
   this.app = app;
   this.elements = elements;
   this.options = _.extend({
@@ -96,6 +97,7 @@ DataForm.prototype.registerRoutes = function () {
 //    Add a resource, specifying the model and any options.
 //    Models may include their own options, which means they can be passed through from the model file
 DataForm.prototype.addResource = function (resourceName, model, options) {
+  debug('Added resource %s', resourceName);
   var resource = {
     resourceName: resourceName,
     options: options || {}
