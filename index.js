@@ -673,9 +673,10 @@ DataForm.prototype.reportInternal = function (req, resource, schema, options, ca
 
 DataForm.prototype.saveAndRespond = function (req, res, hiddenFields, references) {
 
+  var self = this;
   function internalSave(doc) {
     var modelName = doc.constructor.modelName;
-    elements.save(modelName, function (err, doc2) {
+    self.elements.save(modelName, function (err, doc2) {
       if (err) {
         var err2 = {status: 'err'};
         if (!err.errors) {
