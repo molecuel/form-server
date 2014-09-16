@@ -369,6 +369,10 @@ DataForm.prototype.preprocess = function (paths, formSchema) {
             } else {
               realType.instance = typeType;
             }
+
+            if(realType.options.type == mongoose.Schema.Types.Mixed) {
+              realType.instance = 'Object';
+            }
           }
         }
         outPath[element] = extend(true, {}, paths[element]);
