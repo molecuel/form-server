@@ -376,7 +376,7 @@ DataForm.prototype.preprocess = function (paths, formSchema) {
               realType.instance = typeType;
             }
 
-            if(realType.options.type == mongoose.Schema.Types.Mixed) {
+            if(realType.options.type == elements.Types.Mixed) {
               realType.instance = 'Object';
             }
           }
