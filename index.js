@@ -340,6 +340,7 @@ DataForm.prototype.redirect = function (address, req, res) {
 };
 
 DataForm.prototype.preprocess = function (paths, formSchema) {
+  var self = this;
   var outPath = {},
     hiddenFields = [],
     listFields = [];
@@ -376,7 +377,7 @@ DataForm.prototype.preprocess = function (paths, formSchema) {
               realType.instance = typeType;
             }
 
-            if(realType.options.type == elements.Types.Mixed) {
+            if(realType.options.type == self.elements.Types.Mixed) {
               realType.instance = 'Object';
             }
           }
@@ -550,7 +551,7 @@ DataForm.prototype.reportInternal = function (req, resource, schema, options, ca
               } else {
                 var objectIdTest = /^([0-9a-fA-F]{24})$/.exec(obj[prop]);
                 if (objectIdTest) {
-                  obj[prop] = new elements.ObjectId(objectIdTest[1]);
+                  obj[prop] = new self.elements.ObjectId(objectIdTest[1]);
                 }
               }
             } else if (_.isObject(obj[prop])) {
