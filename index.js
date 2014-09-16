@@ -25,10 +25,11 @@ function processArgs(options, array) {
   return array;
 }
 
-var DataForm = function (app, elements, options) {
+var DataForm = function (app, elements, molecuel, options) {
   _.mixin(underscoreNested);
   this.app = app;
   this.elements = elements;
+  this.molecuel = molecuel;
   this.options = _.extend({
     urlPrefix: '/api/'
   }, options || {});
@@ -68,6 +69,8 @@ DataForm.prototype.getListFields = function (resource, doc) {
 DataForm.prototype.registerRoutes = function () {
 
   this.app.get.apply(this.app, processArgs(this.options, ['models', this.models()]));
+  this.app.get.apply(this.app, processArgs(this.options, ['models/editable', this.modelsEditable()]));
+
   this.app.get.apply(this.app, processArgs(this.options, ['search/:resourceName', this.search()]));
 
   this.app.get.apply(this.app, processArgs(this.options, ['schema/:resourceName', this.schema()]));
@@ -325,6 +328,31 @@ DataForm.prototype.models = function () {
     res.send(that.resources);
   };
 };
+
+DataForm.prototype.modelsEditable = function () {
+
+  var that = this;
+
+  return function (req, res) {
+    var returnValue = that.resources;
+    if(that.molecuel && that.molecuel.config && that.molecuel.config.elements &&
+      that.molecuel.config.elements.restrictList) {
+
+      returnValue = [];
+      async.each(that.resources, function(item, callback) {
+        if(_.contains(that.molecuel.config.elements.restrictList, item.resourceName)) {
+          returnValue.push(item);
+        }
+        callback();
+      }, function(err) {
+        res.send(returnValue);
+      });
+    } else {
+      res.send(returnValue);
+    }
+  };
+};
+
 
 
 DataForm.prototype.renderError = function (err, redirectUrl, req, res) {
