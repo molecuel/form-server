@@ -75,9 +75,7 @@ DataForm.prototype.registerRoutes = function () {
   this.app.get.apply(this.app, processArgs(this.options, ['report/:resourceName', this.report()]));
   this.app.get.apply(this.app, processArgs(this.options, ['report/:resourceName/:reportName', this.report()]));
 
-  this.app.all.apply(this.app, processArgs(this.options, [':resourceName', this.collection()]));
   this.app.get.apply(this.app, processArgs(this.options, [':resourceName', this.collectionGet()]));
-
   this.app.post.apply(this.app, processArgs(this.options, [':resourceName', this.collectionPost()]));
 
   this.app.all.apply(this.app, processArgs(this.options, [':resourceName/:id', this.entity()]));
@@ -97,7 +95,6 @@ DataForm.prototype.registerRoutes = function () {
 //    Add a resource, specifying the model and any options.
 //    Models may include their own options, which means they can be passed through from the model file
 DataForm.prototype.addResource = function (resourceName, model, options) {
-  debug('Added resource %s', resourceName);
   var resource = {
     resourceName: resourceName,
     options: options || {}
@@ -351,19 +348,28 @@ DataForm.prototype.preprocess = function (paths, formSchema) {
       // check for schemas
       if (paths[element].schema) {
         var subSchemaInfo = this.preprocess(paths[element].schema.paths);
-        outPath[element] = {schema: subSchemaInfo.paths};
+        outPath[element] = {
+          schema: subSchemaInfo.paths,
+          array: true
+        };
         if (paths[element].options.form) {
           outPath[element].options = {form: extend(true, {}, paths[element].options.form)};
         }
       } else {
-        // check for arrays
-        var realType = paths[element].caster ? paths[element].caster : paths[element];
-        if (!realType.instance) {
 
+        var realType;
+        // check for arrays
+        if(paths[element].caster) {
+          realType = paths[element].caster;
+          paths[element].array = true;
+        } else {
+          realType = paths[element];
+        }
+
+        if (!realType.instance) {
           if (realType.options.type) {
             var type = realType.options.type(),
               typeType = typeof type;
-
             if (typeType === 'string') {
               realType.instance = (!isNaN(Date.parse(type))) ? 'Date' : 'String';
             } else {
@@ -429,7 +435,7 @@ DataForm.prototype.schema = function () {
       formSchema = req.resource.model.schema.statics['form'](req.params.formName);
     }
     var paths = this.preprocess(req.resource.model.schema.paths, formSchema).paths;
-    res.send(JSON.stringify(paths));
+    res.json(paths);
   }, this);
 };
 
@@ -731,22 +737,11 @@ DataForm.prototype.saveAndRespond = function (req, res, hiddenFields, references
 };
 
 /**
- * All entities REST functions have to go through this first.
- */
-DataForm.prototype.collection = function () {
-  return _.bind(function (req, res, next) {
-    if (!(req.resource = this.getResource(req.params.resourceName))) {
-      return next();
-    }
-    return next();
-  }, this);
-};
-
-/**
  * Renders a view with the list of docs, which may be filtered by the f query parameter
  */
 DataForm.prototype.collectionGet = function () {
   return _.bind(function (req, res, next) {
+    req.resource = this.getResource(req.params.resourceName);
     if (!req.resource) {
       return next();
     }
@@ -758,10 +753,11 @@ DataForm.prototype.collectionGet = function () {
       var limitParam        = urlParts.query.l ? JSON.parse(urlParts.query.l) : {};
       var skipParam         = urlParts.query.s ? JSON.parse(urlParts.query.s) : {};
       var orderParam        = urlParts.query.o ? JSON.parse(urlParts.query.o) : req.resource.options.listOrder;
+      var pageSize          = urlParts.query.pagesize ? JSON.parse(urlParts.query.pagesize): 50;
 
       var self = this;
 
-      this.filteredFind(req.resource, req, aggregationParam, findParam, orderParam, limitParam, skipParam, function (err, docs) {
+      this.filteredList(req.resource, req, aggregationParam, findParam, orderParam, limitParam, skipParam, pageSize, function (err, docs) {
         if (err) {
           return self.renderError(err, null, req, res, next);
         } else {
@@ -826,8 +822,87 @@ DataForm.prototype.filteredFind = function (resource, req, aggregationParam, fin
   });
 };
 
+DataForm.prototype.filteredList = function (resource, req, aggregationParam, findParam, sortOrder, limit, skip, pageSize, callback) {
+
+  var that = this,
+    hiddenFields = this.generateHiddenFields(resource, false);
+
+  function doAggregation(cb) {
+    if (aggregationParam) {
+      resource.model.aggregate(aggregationParam, function (err, aggregationResults) {
+        if (err) {
+          throw err;
+        } else {
+          cb(_.map(aggregationResults, function (obj) {
+            return obj._id;
+          }));
+        }
+      });
+    } else {
+      cb([]);
+    }
+  }
+
+  doAggregation(function (idArray) {
+    if (aggregationParam && idArray.length === 0) {
+      callback(null, []);
+    } else {
+      that.doFindFunc(req, resource, function (err, queryObj) {
+        if (err) {
+          callback(err);
+        } else {
+          async.parallel({
+            count: function(cb) {
+              var query = resource.model.count(queryObj);
+              if (idArray.length > 0) {
+                query = query.where('_id').in(idArray);
+              }
+              if (limit)      { query = query.limit(limit); }
+              if (skip)       { query = query.skip(skip); }
+              if (sortOrder)  { query = query.sort(sortOrder); }
+              query.exec(cb);
+            },
+            results: function(cb) {
+              var query = resource.model.find(queryObj);
+              if (idArray.length > 0) {
+                query = query.where('_id').in(idArray);
+              }
+              query = query.find(findParam).select(hiddenFields);
+              if (limit)      { query = query.limit(limit); }
+              if (skip)       { query = query.skip(skip); }
+              if (sortOrder)  { query = query.sort(sortOrder); }
+              query.exec(cb);
+            }
+          }, function(error, data) {
+
+            req.resource = that.getResource(req.params.resourceName);
+
+            var formSchema = null;
+            if (req.params.formName) {
+              formSchema = req.resource.model.schema.statics['form'](req.params.formName);
+            }
+            var listFields = that.preprocess(req.resource.model.schema.paths, formSchema).listFields;
+
+            if (error) {
+              return callback(error);
+            }
+            var resultObject = {
+              total: data.count,
+              pages: Math.ceil(data.count / pageSize),
+              listFields: listFields,
+              hits: data.results
+            }
+            callback(null, resultObject);
+          });
+        }
+      });
+    }
+  });
+};
+
 DataForm.prototype.collectionPost = function () {
   return _.bind(function (req, res, next) {
+    req.resource = this.getResource(req.params.resourceName);
     if (!req.resource) {
       next();
       return;
@@ -836,7 +911,6 @@ DataForm.prototype.collectionPost = function () {
 
     var cleansedBody = this.cleanseRequest(req);
     req.doc = new req.resource.model(cleansedBody);
-
     this.saveAndRespond(req, res);
   }, this);
 };
@@ -959,27 +1033,15 @@ DataForm.prototype.entityPut = function () {
       req.doc[name] = (value === '') ? undefined : value;
     });
 
-    // Since populated ObjectId references are not handled correctly on the client we have to "de-populate" them before
-    // sending back the object to the client
-    var referenceObjectPaths = [];
-    if (req.resource.options.paths !== undefined) {
-      _.each(req.resource.options.paths, function(path, pathname) {
-        if(path.options && path.options.ref) {
-          referenceObjectPaths.push(pathname);
-        }
-      });
-    }
-
-    var hiddenFields = {};
     if (req.resource.options.hide !== undefined) {
-      hiddenFields = this.generateHiddenFields(req.resource, true);
+      var hiddenFields = this.generateHiddenFields(req.resource, true);
       hiddenFields._id = false;
       req.resource.model.findById(req.doc._id, hiddenFields, {lean: true}, function (err, data) {
         that.replaceHiddenFields(req.doc, data);
-        that.saveAndRespond(req, res, hiddenFields, referenceObjectPaths);
+        that.saveAndRespond(req, res, hiddenFields);
       });
     } else {
-      that.saveAndRespond(req, res, hiddenFields, referenceObjectPaths);
+      that.saveAndRespond(req, res);
     }
   }, this);
 };
