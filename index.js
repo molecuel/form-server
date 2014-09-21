@@ -68,6 +68,12 @@ DataForm.prototype.getListFields = function (resource, doc) {
  */
 DataForm.prototype.registerRoutes = function () {
 
+  this.app.use(function(req, res, next) {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,OPTIONS,DELETE');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    next();
+  });
   this.app.get.apply(this.app, processArgs(this.options, ['models', this.models()]));
   this.app.get.apply(this.app, processArgs(this.options, ['models/editable', this.modelsEditable()]));
 
@@ -783,10 +789,11 @@ DataForm.prototype.collectionGet = function () {
       var skipParam         = urlParts.query.s ? JSON.parse(urlParts.query.s) : {};
       var orderParam        = urlParts.query.o ? JSON.parse(urlParts.query.o) : req.resource.options.listOrder;
       var pageSize          = urlParts.query.pagesize ? JSON.parse(urlParts.query.pagesize): 50;
+      var page              = urlParts.query.page ? JSON.parse(urlParts.query.page): 1;
 
       var self = this;
 
-      this.filteredList(req.resource, req, aggregationParam, findParam, orderParam, limitParam, skipParam, pageSize, function (err, docs) {
+      this.filteredList(req.resource, req, aggregationParam, findParam, orderParam, limitParam, skipParam, page, pageSize, function (err, docs) {
         if (err) {
           return self.renderError(err, null, req, res, next);
         } else {
@@ -808,7 +815,6 @@ DataForm.prototype.doFindFunc = function (req, resource, cb) {
 };
 
 DataForm.prototype.filteredFind = function (resource, req, aggregationParam, findParam, sortOrder, limit, skip, callback) {
-
   var that = this,
     hiddenFields = this.generateHiddenFields(resource, false);
 
@@ -851,8 +857,7 @@ DataForm.prototype.filteredFind = function (resource, req, aggregationParam, fin
   });
 };
 
-DataForm.prototype.filteredList = function (resource, req, aggregationParam, findParam, sortOrder, limit, skip, pageSize, callback) {
-
+DataForm.prototype.filteredList = function (resource, req, aggregationParam, findParam, sortOrder, limit, skip, page, pageSize, callback) {
   var that = this,
     hiddenFields = this.generateHiddenFields(resource, false);
 
@@ -873,6 +878,7 @@ DataForm.prototype.filteredList = function (resource, req, aggregationParam, fin
   }
 
   doAggregation(function (idArray) {
+
     if (aggregationParam && idArray.length === 0) {
       callback(null, []);
     } else {
@@ -880,15 +886,15 @@ DataForm.prototype.filteredList = function (resource, req, aggregationParam, fin
         if (err) {
           callback(err);
         } else {
+
           async.parallel({
             count: function(cb) {
               var query = resource.model.count(queryObj);
               if (idArray.length > 0) {
                 query = query.where('_id').in(idArray);
               }
-              if (limit)      { query = query.limit(limit); }
-              if (skip)       { query = query.skip(skip); }
-              if (sortOrder)  { query = query.sort(sortOrder); }
+              //query = query.find(findParam);
+
               query.exec(cb);
             },
             results: function(cb) {
@@ -897,9 +903,16 @@ DataForm.prototype.filteredList = function (resource, req, aggregationParam, fin
                 query = query.where('_id').in(idArray);
               }
               query = query.find(findParam).select(hiddenFields);
-              if (limit)      { query = query.limit(limit); }
-              if (skip)       { query = query.skip(skip); }
+              var mylimit = 0;
+              if (pageSize)      { query = query.limit(pageSize); }
               if (sortOrder)  { query = query.sort(sortOrder); }
+              if (page)  {
+                mylimit = page * pageSize;
+                query = query.sort(sortOrder);
+              }
+              if(page > 1 && mylimit > 0) {
+                query = query.skip(mylimit)
+              }
               query.exec(cb);
             }
           }, function(error, data) {
@@ -917,7 +930,7 @@ DataForm.prototype.filteredList = function (resource, req, aggregationParam, fin
             }
             var resultObject = {
               total: data.count,
-              pages: Math.ceil(data.count / pageSize),
+              pages: Math.floor(data.count / pageSize),
               listFields: listFields,
               hits: data.results
             }
