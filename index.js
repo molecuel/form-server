@@ -385,7 +385,8 @@ DataForm.prototype.preprocess = function (paths, formSchema) {
         var subSchemaInfo = this.preprocess(paths[element].schema.paths);
         outPath[element] = {
           schema: subSchemaInfo.paths,
-          array: true
+          array: true,
+          instance: 'Array'
         };
         if (paths[element].options.form) {
           outPath[element].options = {form: extend(true, {}, paths[element].options.form)};
@@ -396,7 +397,9 @@ DataForm.prototype.preprocess = function (paths, formSchema) {
         // check for arrays
         if(paths[element].caster) {
           realType = paths[element].caster;
+          realType.options.type = paths[element].casterConstructor;
           paths[element].array = true;
+          paths[element].instance = 'Array';
         } else {
           realType = paths[element];
         }
@@ -730,7 +733,6 @@ DataForm.prototype.saveAndRespond = function (req, res, hiddenFields, references
           extend(err2, err);
         }
 
-        console.log('Error saving record: ' + JSON.stringify(err2));
         if (debug) {
           console.log('Error saving record: ' + JSON.stringify(err2));
         }
