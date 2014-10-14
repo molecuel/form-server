@@ -100,6 +100,7 @@ DataForm.prototype.registerRoutes = function () {
   this.app.get.apply(this.app, processArgs(this.options, ['models/editable', this.modelsEditable()]));
 
   this.app.get.apply(this.app, processArgs(this.options, ['search/:resourceName', this.search()]));
+  this.app.get.apply(this.app, processArgs(this.options, ['search/:resourceName/:id', this.searchById()]));
 
   this.app.get.apply(this.app, processArgs(this.options, ['schema/:resourceName', this.schema()]));
   this.app.get.apply(this.app, processArgs(this.options, ['schema/:resourceName/:formName', this.schema()]));
@@ -162,7 +163,7 @@ DataForm.prototype.getResource = function (name) {
   });
 };
 
-DataForm.prototype.internalSearch = function (req, resourcesToSearch, limit, callback) {
+DataForm.prototype.internalSearch = function (req, resourcesToSearch, limit, id, callback) {
   var searches = [],
     resourceCount = resourcesToSearch.length,
     urlParts = url.parse(req.url, true),
@@ -200,37 +201,44 @@ DataForm.prototype.internalSearch = function (req, resourcesToSearch, limit, cal
     filter = JSON.parse(filter);
   }
 
-  for (var i = 0; i < resourceCount; i++) {
-    var resource = resourcesToSearch[i];
-    if (resource.options.searchImportance !== false) {
-      var schema = resource.model.schema;
-      var indexedFields = [];
-      for (var j = 0; j < schema._indexes.length; j++) {
-        var attributes = schema._indexes[j][0];
-        var field = Object.keys(attributes)[0];
-        if (indexedFields.indexOf(field) === -1) {
-          indexedFields.push(field);
+  var indexedFields = [];
+
+  if(id) {
+    var resource = resourcesToSearch[0];
+    var schema = resource.model.schema;
+    searches.push({resource: resource, field: ['_id']});
+  } else {
+    for (var i = 0; i < resourceCount; i++) {
+      var resource = resourcesToSearch[i];
+      if (resource.options.searchImportance !== false) {
+        var schema = resource.model.schema;
+        for (var j = 0; j < schema._indexes.length; j++) {
+          var attributes = schema._indexes[j][0];
+          var field = Object.keys(attributes)[0];
+          if (indexedFields.indexOf(field) === -1) {
+            indexedFields.push(field);
+          }
         }
-      }
-      for (var path in schema.paths) {
-        if (path !== '_id' && schema.paths.hasOwnProperty(path)) {
-          if (schema.paths[path]._index && !schema.paths[path].options.noSearch) {
-            if (indexedFields.indexOf(path) === -1) {
-              indexedFields.push(path);
+        for (var path in schema.paths) {
+          if (path !== '_id' && schema.paths.hasOwnProperty(path)) {
+            if (schema.paths[path]._index && !schema.paths[path].options.noSearch) {
+              if (indexedFields.indexOf(path) === -1) {
+                indexedFields.push(path);
+              }
             }
           }
         }
-      }
 
-      if(indexedFields.length == 0) {
-        var availFields = Object.keys(schema.paths);
-        if(_.contains(availFields, 'title')) {
-          indexedFields.push('title');
+        if(indexedFields.length == 0) {
+          var availFields = Object.keys(schema.paths);
+          if(_.contains(availFields, 'title')) {
+            indexedFields.push('title');
+          }
         }
-      }
 
-      for (var m = 0; m < indexedFields.length; m++) {
-        searches.push({resource: resource, field: indexedFields[m] });
+        for (var m = 0; m < indexedFields.length; m++) {
+          searches.push({resource: resource, field: indexedFields[m] });
+        }
       }
     }
   }
@@ -246,6 +254,10 @@ DataForm.prototype.internalSearch = function (req, resourcesToSearch, limit, cal
   } else {
     // called from somewhere else (probably select2 ajax) preserve spaces
     searchCriteria = {$regex: '^' + searchFor, $options: 'i'};
+  }
+
+  if(id) {
+    searchCriteria = id;
   }
 
   this.searchFunc(
@@ -266,7 +278,6 @@ DataForm.prototype.internalSearch = function (req, resourcesToSearch, limit, cal
       } else {
         searchDoc[item.field] = searchCriteria;
       }
-
       // The +60 in the next line is an arbitrary safety zone for situations where items that match the string
       // in more than one index get filtered out.
       // TODO : Figure out a better way to deal with this
@@ -342,15 +353,28 @@ DataForm.prototype.search = function () {
       return next();
     }
 
-    this.internalSearch(req, [req.resource], 10, function (resultsObject) {
+    this.internalSearch(req, [req.resource], 10, null, function (resultsObject) {
       res.send(resultsObject);
     });
   }, this);
 };
 
+DataForm.prototype.searchById = function () {
+  return _.bind(function (req, res, next) {
+    if (!(req.resource = this.getResource(req.params.resourceName))) {
+      return next();
+    }
+
+    this.internalSearch(req, [req.resource], 10, req.params.id, function (resultsObject) {
+      res.send(resultsObject);
+    });
+  }, this);
+};
+
+
 DataForm.prototype.searchAll = function () {
   return _.bind(function (req, res) {
-    this.internalSearch(req, this.resources, 10, function (resultsObject) {
+    this.internalSearch(req, this.resources, 10, null, function (resultsObject) {
       res.send(resultsObject);
     });
   }, this);
