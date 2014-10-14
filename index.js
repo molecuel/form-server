@@ -63,6 +63,28 @@ DataForm.prototype.getListFields = function (resource, doc) {
   return display.trim();
 };
 
+DataForm.prototype.getSelectFields = function (resource, doc) {
+  var display = '',
+    listElement = 0,
+    listFields = resource.options.selectFields;
+
+  if (listFields) {
+    for (; listElement < listFields.length; listElement++) {
+      display += doc[listFields[listElement].field] + ' ';
+    }
+  } else {
+    listFields = Object.keys(resource.model.schema.paths);
+    if(_.contains(listFields, 'title')) {
+      display = doc.title;
+    } else {
+      for (; listElement < 2; listElement++) {
+        display += doc[listFields[listElement]] + ' ';
+      }
+    }
+  }
+  return display.trim();
+};
+
 /**
  * Registers all REST routes with the provided `app` object.
  */
@@ -199,6 +221,14 @@ DataForm.prototype.internalSearch = function (req, resourcesToSearch, limit, cal
           }
         }
       }
+
+      if(indexedFields.length == 0) {
+        var availFields = Object.keys(schema.paths);
+        if(_.contains(availFields, 'title')) {
+          indexedFields.push('title');
+        }
+      }
+
       for (var m = 0; m < indexedFields.length; m++) {
         searches.push({resource: resource, field: indexedFields[m] });
       }
@@ -273,7 +303,7 @@ DataForm.prototype.internalSearch = function (req, resourcesToSearch, limit, cal
                 resultObject = {
                   id: thisId,
                   weighting: 9999,
-                  text: that.getListFields(item.resource, docs[k])
+                  text: that.getSelectFields(item.resource, docs[k])
                 };
                 if (resourceCount > 1) {
                   resultObject.resource = resultObject.resourceText = item.resource.resourceName;
@@ -377,6 +407,7 @@ DataForm.prototype.preprocess = function (paths, formSchema) {
   var self = this;
   var outPath = {},
     hiddenFields = [],
+    selectFields = [],
     listFields = [];
   for (var element in paths) {
     if (paths.hasOwnProperty(element) && element !== '__v') {
@@ -428,6 +459,9 @@ DataForm.prototype.preprocess = function (paths, formSchema) {
         }
         if (paths[element].options.list) {
           listFields.push({field: element, params: paths[element].options.list});
+        }
+        if (paths[element].options.select) {
+          selectFields.push({field: element, params: paths[element].options.select});
         }
       }
     }
