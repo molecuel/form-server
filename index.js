@@ -518,6 +518,10 @@ DataForm.prototype.preprocess = function (paths, formSchema) {
   if (listFields.length > 0) {
     returnObj.listFields = listFields;
   }
+
+  if (selectFields.length > 0) {
+    returnObj.selectFields = selectFields;
+  }
   return returnObj;
 };
 
