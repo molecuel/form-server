@@ -848,11 +848,11 @@ DataForm.prototype.collectionGet = function () {
     var urlParts = url.parse(req.url, true);
     try {
       var aggregationParam  = urlParts.query.a ? JSON.parse(urlParts.query.a) : null;
-      var findParam         = urlParts.query.f ? JSON.parse(urlParts.query.f) : {};
+      var findParam         = req.query.filter ? req.query.filter : {};
       var limitParam        = urlParts.query.l ? JSON.parse(urlParts.query.l) : {};
       var skipParam         = urlParts.query.s ? JSON.parse(urlParts.query.s) : {};
-      var orderParam        = urlParts.query.o ? JSON.parse(urlParts.query.o) : req.resource.options.listOrder;
-      var pageSize          = urlParts.query.pagesize ? JSON.parse(urlParts.query.pagesize): 50;
+      var orderParam        = urlParts.query.sort ? JSON.parse(urlParts.query.sort) : req.resource.options.listOrder;
+      var pageSize          = urlParts.query.count ? JSON.parse(urlParts.query.count): 50;
       var page              = urlParts.query.page ? JSON.parse(urlParts.query.page): 1;
 
       var self = this;
@@ -966,7 +966,13 @@ DataForm.prototype.filteredList = function (resource, req, aggregationParam, fin
               if (idArray.length > 0) {
                 query = query.where('_id').in(idArray);
               }
-              query = query.find(findParam).select(hiddenFields);
+              var newParam = {};
+
+              _.each(Object.keys(findParam), function(key) {
+                newParam[key] = {$regex: '^' + findParam[key], $options: 'i'};
+              });
+              
+              query = query.find(newParam).select(hiddenFields);
               var mylimit = 0;
               if (pageSize)      { query = query.limit(pageSize); }
               if (sortOrder)  { query = query.sort(sortOrder); }
