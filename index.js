@@ -966,13 +966,20 @@ DataForm.prototype.filteredList = function (resource, req, aggregationParam, fin
               if (idArray.length > 0) {
                 query = query.where('_id').in(idArray);
               }
-              var newParam = {};
+
+              var paramArr = [];
 
               _.each(Object.keys(findParam), function(key) {
+                var newParam = {};
                 newParam[key] = {$regex: findParam[key], $options: 'i'};
+                paramArr.push(newParam);
               });
 
-              query = query.find(newParam).select(hiddenFields);
+              if(paramArr.length > 0) {
+                query = query.find({}).or(paramArr).select(hiddenFields);
+              } else {
+                query = query.find({}).select(hiddenFields);
+              }
               var mylimit = 0;
               if (pageSize)      { query = query.limit(pageSize); }
               if (sortOrder)  { query = query.sort(sortOrder); }
