@@ -851,7 +851,7 @@ DataForm.prototype.collectionGet = function () {
       var findParam         = req.query.filter ? req.query.filter : {};
       var limitParam        = urlParts.query.l ? JSON.parse(urlParts.query.l) : {};
       var skipParam         = urlParts.query.s ? JSON.parse(urlParts.query.s) : {};
-      var orderParam        = urlParts.query.sort ? JSON.parse(urlParts.query.sort) : req.resource.options.listOrder;
+      var orderParam        = req.query.sorting ? req.query.sorting : req.resource.options.listOrder;
       var pageSize          = urlParts.query.count ? JSON.parse(urlParts.query.count): 50;
       var page              = urlParts.query.page ? JSON.parse(urlParts.query.page): 1;
 
