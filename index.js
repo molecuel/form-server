@@ -969,9 +969,9 @@ DataForm.prototype.filteredList = function (resource, req, aggregationParam, fin
               var newParam = {};
 
               _.each(Object.keys(findParam), function(key) {
-                newParam[key] = {$regex: '^' + findParam[key], $options: 'i'};
+                newParam[key] = {$regex: findParam[key], $options: 'i'};
               });
-              
+
               query = query.find(newParam).select(hiddenFields);
               var mylimit = 0;
               if (pageSize)      { query = query.limit(pageSize); }
