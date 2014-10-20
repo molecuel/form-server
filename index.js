@@ -482,7 +482,7 @@ DataForm.prototype.preprocess = function (paths, formSchema) {
           outPath[element].options.match = paths[element].options.match.source;
         }
         if (paths[element].options.list) {
-          listFields.push({field: element, params: paths[element].options.list});
+          listFields.push({field: element, params: paths[element].options.list, instance: paths[element].instance});
         }
         if (paths[element].options.select) {
           selectFields.push({field: element, params: paths[element].options.select});
@@ -968,11 +968,15 @@ DataForm.prototype.filteredList = function (resource, req, aggregationParam, fin
               }
 
               var paramArr = [];
+              var mypaths = resource.model.schema.paths;
 
               _.each(Object.keys(findParam), function(key) {
-                var newParam = {};
-                newParam[key] = {$regex: findParam[key], $options: 'i'};
-                paramArr.push(newParam);
+                // Search function for strings
+                if(mypaths[key] && mypaths[key].options.type === String) {
+                  var newParam = {};
+                  newParam[key] = {$regex: findParam[key], $options: 'i'};
+                  paramArr.push(newParam);
+                }
               });
 
               if(paramArr.length > 0) {
